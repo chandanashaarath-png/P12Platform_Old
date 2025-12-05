@@ -30,9 +30,9 @@ const nftQuery = `
     `;
 
 const historyQuery = `
-    query($address: String!) {   
+    query($address: String!, $page: Int!, $limit: Int!) {   
         user(addr: $address) {
-          bridgeTxs {
+          bridgeTxs(page: $page, limit: $limit) {
             hash   
             chainId  
             timestamp   
@@ -84,11 +84,13 @@ export const useBadgeNFT = (address?: Address) => {
   });
 };
 
-export const useBadgeHistory = <T>(address?: Address) => {
-  return useQuery(['fetch_badge_history', address], async () => {
+export const useBadgeHistory = <T>(address?: Address, page = 1, limit = 20) => {
+  return useQuery(['fetch_badge_history', address, page, limit], async () => {
     if (!address) return {} as T;
     const variables = {
       address: address,
+        page: page,
+        limit: limit
     };
     const data = await client.request(historyQuery, variables);
     return data as T;
