@@ -10,6 +10,8 @@ import { Tooltip } from '../tooltip';
 import Table from '../table';
 import { createColumnHelper } from '@tanstack/react-table';
 import dayjs from 'dayjs';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInView } from 'react-intersection-observer';
 import {
   BridgeTxs,
   HistoryResult,
@@ -47,7 +49,16 @@ export default function BridgeSwitch() {
   const { address } = useAccount();
 
   const { data, refetch } = useBadgeNFT(address);
-  const { data: historyData, isLoading } = useBadgeHistory<HistoryResult>(address);
+  /*const { data: historyData, isLoading } = useBadgeHistory<HistoryResult>(address);*/
+  const {
+  data: historyPages,
+  fetchNextPage,
+  hasNextPage,
+  isFetchingNextPage,
+  isLoading: historyLoading,
+} = useBadgeHistory(address, 20); // 20 items per page
+  const { ref, inView } = useInView();
+
   const [orderData, setOrderData] = useState<BridgeTxs[]>([]);
 
   const [nftOwned, setNFTOwned] = useState<GalxeBadge[][]>([]);
@@ -116,12 +127,37 @@ export default function BridgeSwitch() {
   });
 
   useEffect(() => {
-    const data: BridgeTxs[] = historyData?.user?.bridgeTxs ?? [];
-    if (data.length > 0) {
+  if (inView && hasNextPage) {
+    fetchNextPage();
+  }
+}, [inView, hasNextPage]);
+  
+  useEffect(() => {
+    /*const data: BridgeTxs[] = historyData?.user?.bridgeTxs ?? [];
+   if (data.length > 0) {
       data.sort((a, b) => b.timestamp - a.timestamp);
       setOrderData(data);
     }
-  }, [historyData]);
+  }, [historyData]);*/
+
+      const historyItems =
+  historyPages?.pages.flatMap(page => page?.user?.bridgeTxs || []) || [];
+  {historyLoading && <p>Loading history...</p>}
+
+  {!historyLoading && historyItems.length === 0 && (
+  <p>No bridge history found.</p>
+  )}
+
+  {historyItems.map((tx, i) => (
+  <HistoryItem key={tx.hash + i} tx={tx} />
+  ))}
+
+{/* Infinite scroll sentinel */}
+{hasNextPage && (
+  <div ref={ref} style={{ height: 30 }} />
+)}
+
+  {isFetchingNextPage && <p>Loading more...</p>}
 
   useEffect(() => {
     if (!selectedBadge || !NFTContract || !address || chain?.id !== selectedBadge.chainId) return;
