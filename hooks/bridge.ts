@@ -30,9 +30,9 @@ const nftQuery = `
     `;
 
 const historyQuery = `
-    query($address: String!) {   
+    query($address: String!, $page: Int!, $limit: Int!) {   
         user(addr: $address) {
-          bridgeTxs {
+          bridgeTxs(page: $page, limit: $limit) {
             hash   
             chainId  
             timestamp   
@@ -84,7 +84,7 @@ export const useBadgeNFT = (address?: Address) => {
   });
 };
 
-export const useBadgeHistory = <T>(address?: Address) => {
+/*export const useBadgeHistory = <T>(address?: Address) => {
   return useQuery(['fetch_badge_history', address], async () => {
     if (!address) return {} as T;
     const variables = {
@@ -93,7 +93,40 @@ export const useBadgeHistory = <T>(address?: Address) => {
     const data = await client.request(historyQuery, variables);
     return data as T;
   });
+};*/
+
+import { useInfiniteQuery } from "@tanstack/react-query";
+
+export const useBadgeHistory = (address?: Address, limit = 20) => {
+  return useInfiniteQuery({
+    queryKey: ["fetch_badge_history", address, limit],
+    queryFn: async ({ pageParam = 1 }) => {
+      if (!address) return { user: { bridgeTxs: [] } };
+
+      const variables = {
+        address,
+        page: pageParam,
+        limit,
+      };
+
+      const data = await client.request(historyQuery, variables);
+      return { ...data, page: pageParam };
+    },
+
+    /** 
+     * React Query decides the next page based on existing pages.
+     * If the last response has fewer than the limit, there's no more pages.
+     */
+    getNextPageParam: (lastPage) => {
+      const results = lastPage?.user?.bridgeTxs || [];
+      return results.length < limit ? undefined : lastPage.page + 1;
+    },
+
+    enabled: !!address, // prevents query from running if no wallet connected
+    staleTime: 1000 * 60 * 5, // cache data for 5 minutes
+  });
 };
+
 
 export const usePowerLevel = <T>(address?: Address) => {
   return useQuery(['fetch_power_level', address], async () => {
